@@ -410,26 +410,63 @@ class API:
             self._log("warning", LogEmoji.WARNING, "获取积分失败", force=True)
             return "None 积分", 0
 
+    
     @log_method
     def exchange(self, cookies: str, plan: str, required_points: int) -> str:
-        """执行兑换"""
+        """积分查询成功且达到门槛后才执行兑换"""
+
+        points_str, points_num = self.get_points(cookies)
+
+        if points_str == "None 积分":
+            message = "积分查询失败，跳过兑换，避免误发兑换请求"
+            self._log("warning", LogEmoji.WARNING, message, force=True)
+            return message
+
+        if points_num < required_points:
+            message = (
+                f"积分不足，跳过兑换：当前 {points_num} 积分，"
+                f"需要 {required_points} 积分"
+            )
+            self._log("info", LogEmoji.INFO, message, force=True)
+            return message
+
         url = self._get_full_url(self.EXCHANGE_URL)
-        response = self._make_request(url, "POST", {"planType": plan}, cookies)
+        response = self._make_request(
+            url, "POST", {"planType": plan}, cookies
+        )
 
-        if response:
+        if not response:
+            message = "兑换请求失败"
+            self._log("warning", LogEmoji.WARNING, message, force=True)
+            return message
+
+        try:
             data = response.json()
-            code = data.get("code", -2)
-            message = data.get("message", "未知错误")
+        except (ValueError, TypeError):
+            message = "兑换失败：服务器响应格式异常"
+            self._log("warning", LogEmoji.WARNING, message, force=True)
+            return message
 
-            if code == 0:
-                self._log("info", LogEmoji.SUCCESS, f"{{ code : {code}, message : {message} }}")
-                return f"兑换成功: {plan}"
-            else:
-                self._log("info", LogEmoji.FAIL, f"{{ code : {code}, message : {message} }}", force=True)
-                return f"兑换失败: {message}"
-        else:
-            self._log("warning", LogEmoji.WARNING, "兑换失败", force=True)
-            return "兑换失败"
+        code = data.get("code", -2)
+        server_message = data.get("message", "未知错误")
+
+        if code == 0:
+            self._log(
+                "info",
+                LogEmoji.SUCCESS,
+                f"{{ code : {code}, message : {server_message} }}",
+                force=True,
+            )
+            return f"兑换成功: {plan}"
+
+        self._log(
+            "info",
+            LogEmoji.FAIL,
+            f"{{ code : {code}, message : {server_message} }}",
+            force=True,
+        )
+        return f"兑换失败: {server_message}"
+
 
 
 @dataclass()

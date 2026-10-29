@@ -4,7 +4,8 @@ name: auto check
 on:
   workflow_dispatch:
   schedule:
-    - cron: '18 9,12 * * *'
+  - cron: '0 12 * * *'
+  - cron: '0 21 * * *'
 
 permissions:
   contents: read
